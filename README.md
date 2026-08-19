@@ -90,3 +90,43 @@ semantic tokens, no raw HTML), reusing AionUi's multi-provider model plumbing an
 IPC bridge for the device layer in place of the standalone Termux bridge.
 
 *v0.1 · branch `claude/obi-wrapper-agent-os-2nwxpa` · all processing local.*
+
+---
+
+## Live demo (stable link)
+
+The PWA is served (no install, no dummy data) at:
+
+**https://governancemanners-coder.github.io/obi-shell/**
+
+Open it in a browser. For full power (real model + device skills), run the
+bridge on your own device (phone/desktop) and point the app at it — OBI is a
+personal, local-first tool:
+
+```bash
+cd obi-shell
+OBI_ALLOW_EXEC=1 python bridge/obi_bridge.py --port 8420
+# in config.js set BRIDGE_URL to http://localhost:8420 (same device)
+# or http://<your-device-LAN-ip>:8420 from another device
+```
+
+### New this build: OBI Team (`/team`)
+Decompose a goal across specialist agents (Agent-Zero-style): Recon, Reverser,
+Red Team, Analyst, Defender, Scribe. Tap the **Team** button (or `/team <goal>`).
+Runs each subagent, synthesizes a brief, and saves it to per-project memory
+(`obi/projects/<project>/memory.jsonl`). Subagents run sequentially (rate-limit
+safe). With no model connected it falls back to an offline heuristic — connect
+Ollama or a cloud provider in Settings → OBI's brain for live analysis.
+
+### Restart-on-boot (keep it stable)
+The bridge is a long-running process. To have it auto-start in Termux, add to
+your `~/.bashrc` / `~/.profile`:
+```bash
+pgrep -f "obi_bridge.py" >/dev/null || (cd ~/obi-shell && OBI_ALLOW_EXEC=1 nohup python bridge/obi_bridge.py --port 8420 >/dev/null 2>&1 &)
+```
+
+### Reports (this build)
+- `OBI_DEV_STATE.md` — structured development state (what OBI is / is NOT, architecture, verified tests, limitations, next steps).
+- `COUNCIL_OF_FORMATS.md` — UI/UX + output-format review by the Council of Formats.
+
+*Repo: https://github.com/governancemanners-coder/obi-shell*
