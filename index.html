@@ -477,6 +477,7 @@ nav{flex-shrink:0;display:flex;justify-content:center;padding:6px 14px 12px}
   <div style="flex:1;overflow-y:auto" id="notif-list"><div class="empty">All quiet across the horizon.</div></div>
 </div>
 
+<script src="config.js"></script>
 <script>
 /* ════════════════════════════════════════════════════════════════
    OBI KNOWLEDGE + SCANNERS  (ported from the user's own dashboards)
@@ -587,7 +588,7 @@ Style: speak plainly and directly, favor structure and specifics over hedging, a
 
 /* ── Provider connection layer ─────────────────────────────────── */
 const PROVIDERS={
-  bridge:{name:'Obliteratus Bridge (Termux)',endpoint:'http://localhost:8420',key:false,model:'',style:'bridge',hint:'Run obi_bridge.py on your device. Serves the app + device control + local model.'},
+  bridge:{name:'Obliteratus Bridge (Termux)',endpoint:(window.OBI_CONFIG&&window.OBI_CONFIG.BRIDGE_URL)||'http://localhost:8420',key:false,model:'',style:'bridge',hint:'Run obi_bridge.py on your device. Serves the app + device control + local model.'},
   openrouter:{name:'OpenRouter',endpoint:'https://openrouter.ai/api/v1/chat/completions',key:true,model:'nvidia/nemotron-3-nano-30b-a3b:free',style:'openai',hint:'Works in-browser. Paste your OpenRouter key. In openrouter.ai/settings/privacy, turn ON "Allow providers that may train on data" (free/logging providers) or free models return 429.'},
   anthropic:{name:'Anthropic (direct)',endpoint:'https://api.anthropic.com/v1/messages',key:true,model:'claude-3-5-sonnet-latest',style:'anthropic',hint:'Direct browser access — key stays on this device.'},
   nous:{name:'Nous hy3:free (local token)',endpoint:'https://inference-api.nousresearch.com/v1/chat/completions',key:true,model:'tencent/hy3:free',style:'openai',hint:'Free + uncensored, no account needed. Token is read from your device via the bridge — pick this and tap Test connection.'},

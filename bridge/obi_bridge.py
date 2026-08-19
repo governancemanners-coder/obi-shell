@@ -204,8 +204,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             import io, contextlib, sys as _sys
             _harness_dir = os.path.expanduser("~/obi")
-            if _harness_dir not in _sys.path:
-                _sys.path.insert(0, _harness_dir)
+            _here = os.path.dirname(os.path.abspath(__file__))
+            for _p in (_here, _harness_dir):
+                if _p not in _sys.path:
+                    _sys.path.insert(0, _p)
             from obi_harness import run_goal
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
@@ -225,8 +227,10 @@ class Handler(BaseHTTPRequestHandler):
         try:
             import io, contextlib, sys as _sys
             _obi = os.path.expanduser("~/obi")
-            if _obi not in _sys.path:
-                _sys.path.insert(0, _obi)
+            _here = os.path.dirname(os.path.abspath(__file__))
+            for _p in (_here, _obi):
+                if _p not in _sys.path:
+                    _sys.path.insert(0, _p)
             from obi_delegate import run_team
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
