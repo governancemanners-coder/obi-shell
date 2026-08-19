@@ -953,9 +953,10 @@ async function handleCommand(raw){
    OBI TEAM — Agent-Zero-style delegation (calls bridge /team)
    ════════════════════════════════════════════════════════════════ */
 const AGENT_META={
-  Recon:{c:'#e6b24c'},Reverser:{c:'#8a5cff'},'Red Team':{c:'#ff5d6c'},
-  Analyst:{c:'#5fd0c0'},Defender:{c:'#7ad15a'},Scribe:{c:'#d3a4ff'}
+  recon:{c:'#e6b24c'},reverser:{c:'#8a5cff'},'redteam':{c:'#ff5d6c'},
+  analyst:{c:'#5fd0c0'},defender:{c:'#7ad15a'},scribe:{c:'#d3a4ff'}
 };
+const _cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 async function teamRun(goal){
   if(!goal||!goal.trim())return addMsg('obi',`<p class="mono">usage: /team &lt;goal&gt; — describe the task for the squad</p>`,false);
   if(!bridgeUp)return addMsg('obi',`<p class="mono">OBI Team needs the bridge online (Settings → Obliteratus Bridge).</p>`,false);
@@ -972,12 +973,12 @@ async function teamRun(goal){
   const j=await probe.json();
   const out=j.output||'';
   // render agent cards from the SYNTHESIS/roster the bridge returns
-  const roster=(j.roster||[]).map(id=>id.charAt(0).toUpperCase()+id.slice(1));
+  const roster=(j.roster||[]);
   let cards='<div class="who" style="margin-bottom:6px">OBI TEAM · roster</div><div class="cards">';
-  roster.forEach((nm,i)=>{const m=AGENT_META[nm]||{c:'#e6b24c'};
-    cards+=`<div class="acard" style="border-color:${m.c}"><div class="adot" style="background:${m.c}"></div><div class="aname">${esc(nm)}</div><div class="astat">done</div></div>`;});
+  roster.forEach((id)=>{const m=AGENT_META[id]||{c:'#e6b24c'};
+    cards+=`<div class="acard" style="border-color:${m.c}"><div class="adot" style="background:${m.c}"></div><div class="aname">${esc(_cap(id))}</div><div class="astat">done</div></div>`;});
   cards+='</div>';
-  addMsg('obi',cards,`Roster: ${roster.join(', ')}`);
+  addMsg('obi',cards,`Roster: ${roster.map(_cap).join(', ')}`);
   // full transcript
   addMsg('obi',`<div class="who" style="margin-bottom:6px">OBI TEAM · output</div><div class="bubble mono" style="border:none;padding:0;white-space:pre-wrap">${esc(out)}</div>`,`Team delegation complete. Brief saved to project memory.`);
 }
