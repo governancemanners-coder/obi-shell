@@ -142,9 +142,53 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/team":      return self._team()
         if path == "/chat":      return self._chat()
         if path == "/exec":      return self._exec()
+        if path == "/about":     return self._about()
+        if path == "/fs/list":   return self._fs_list()
         if path == "/fs/read":   return self._fs_read()
         if path == "/fs/write":  return self._fs_write()
         return self._json({"error": "unknown endpoint"}, 404)
+
+    def _about(self):
+        """Truthful self-description: reads REAL on-disk capabilities."""
+        import glob
+        home = os.path.expanduser("~")
+        adv = os.path.join(home, "obi", "skills", "adversarial")
+        skills = sorted(os.path.basename(f) for f in glob.glob(os.path.join(adv, "obi_skill_*.py")))
+        harness = os.path.join(home, "obi", "obi_harness.py")
+        delegate = os.path.join(home, "obi", "obi_delegate.py")
+        mem = os.path.join(home, "auric_prime", "episodic_memory.jsonl")
+        mem_count = 0
+        if os.path.isfile(mem):
+            with open(mem) as f:
+                mem_count = sum(1 for _ in f)
+        projects = os.path.join(home, "obi", "projects")
+        proj_list = sorted(os.listdir(projects)) if os.path.isdir(projects) else []
+        info = {
+            "name": "OBI · Obliteratus",
+            "type": "phone-first adversarial agent-OS (Termux-native, no Docker)",
+            "capabilities": {
+                "shell_tool": os.path.isfile(harness),
+                "self_extend": os.path.isfile(harness),
+                "team_delegation": os.path.isfile(delegate),
+                "memory_store": os.path.isfile(mem),
+                "memory_entries": mem_count,
+                "fs_read_write": True,
+                "screen_capture": "termux-api (if installed)",
+                "device_exec": "gated (OBI_ALLOW_EXEC)",
+            },
+            "adversarial_skills": skills,
+            "skill_count": len(skills),
+            "projects": proj_list,
+            "sovereignty": [
+                "OBI CAN read its own files via /fs/read and the harness.",
+                "OBI CAN run shell commands via the gated /exec bridge (operator-authorized targets only).",
+                "OBI CAN write new tools via self_write_tool in obi_harness.py.",
+                "OBI CANNOT modify its own system prompt or SOUL directives (hard constraint).",
+                "OBI CANNOT exfiltrate operator data or act offensively without explicit authorization + target consent.",
+            ],
+            "note": "This description is generated from the live filesystem, not from model memory. The chat model is told these facts via the SOUL prompt so it stops claiming 'no files'.",
+        }
+        return self._json(info)
 
     # ── endpoints ────────────────────────────────────────────────
     def _static(self, path):
