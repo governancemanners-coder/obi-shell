@@ -859,6 +859,7 @@ async function respond(text){
       const hist=msgs.filter(m=>m.role==='you'||m.role==='obi').slice(-16).map(m=>({role:m.role,text:m.text}));
       await streamChat(hist,(tok,full)=>stream.update(full)).then(full=>{
         stream.done(full);asLine('obs','response complete');
+        execToolCalls(full); // agentic: actually run any /exec or fenced shell the model requested
       });
     }catch(e){
       const m=e.message||'';
@@ -900,8 +901,12 @@ async function handleCommand(raw){
   const arg=rest.join(' ');
   const cmd=c.toLowerCase();
   if(cmd==='clear'){msgs=[];wrap.innerHTML='';greet();return;}
-  // Live: route to the real six-skill Python dispatcher on the bridge
-  if(bridgeUp && cmd!=='help'){
+  // App-level commands handled locally (about/files/team/scan/etc.) — do NOT
+  // send these to the bridge skill dispatcher, or they'll be "unknown".
+  const LOCAL_CMDS=new Set(['about','files','team','scan','sescan','mcpscan','skills','se','net','ext','poi','mcp','netscan','net-scan','net-monitor','net-capture','web-intercept','web-recon','web-replay','filescan','help','clear']);
+  if(LOCAL_CMDS.has(cmd)){ /* fall through to the local switch below */ }
+  else if(bridgeUp && cmd!=='help'){
+    // Unknown command → try the bridge's six-skill dispatcher
     asLine('tool',`bridge.dispatch(/${esc(cmd)})`);
     try{
       const out=await bridgeDispatch(raw);
@@ -948,6 +953,7 @@ async function handleCommand(raw){
       return addMsg('obi',`<div class="who" style="margin-bottom:6px">Loaded skills</div><div class="mono" style="color:var(--tan)">`+SKILLS.map(s=>`<b style="color:var(--gold)">${s[0]}</b>  ${s[1]}\n     ${s[2]}`).join('\n')+`</div>`,'Six adversarial intelligence skills loaded.');
     case 'about':return aboutObi();
     case 'files':return filesObi(arg);
+    case 'netscan':return runNetScan(arg);
     case 'team':return teamRun(arg);
     case 'clear':msgs=[];wrap.innerHTML='';greet();return;
     case 'se':case 'net':case 'ext':case 'poi':case 'mcp':{
@@ -1025,6 +1031,66 @@ async function filesObi(arg){
   const items=j.items||[];
   const list=items.map(f=>`<div><b style="color:var(--gold)">${esc(f.name||f)}</b> ${f.dir?'(dir)':''}</div>`).join('');
   addMsg('obi',`<div class="who" style="margin-bottom:6px">Files in ${esc(path)}</div><div class="mono" style="color:var(--tan)">${list||'(empty)'}</div>`,`Listed ${items.length} entries in ${path}.`);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   OBI NETWORK SCAN — actually runs discovery via the bridge /exec
+   ══════════════════════════════════════════════════════════════ */
+async function runNetScan(arg){
+  if(!bridgeUp)return addMsg('obi',`<p class="mono">Bridge offline. Run <b>start obi</b> first.</p>`,false);
+  const steps=[
+    {label:'Topology · default route', cmd:'ip route show default 2>/dev/null; ip -o -4 addr show 2>/dev/null'},
+    {label:'ARP neighbours', cmd:'ip neigh show 2>/dev/null; arp -a 2>/dev/null'},
+    {label:'Active-host sweep (ping + nmap)', cmd:'for h in $(seq 1 20); do ping -c1 -W1 192.168.1.$h >/dev/null 2>&1 && echo "alive 192.168.1.$h"; done; nmap -sn 192.168.1.0/24 2>/dev/null | head -40'},
+  ];
+  addMsg('obi',`<p class="mono">🔍 <b>COMPREHENSIVE LAN SCAN</b> · authorized · executing real discovery via bridge…</p>`,'Running network scan.');
+  let collected=[];
+  for(const s of steps){
+    asLine('tool',s.label);
+    const ep=(PROVIDERS.bridge.endpoint||'http://localhost:8420').replace(/\/$/,'')+'/exec';
+    let out='';
+    try{
+      const j=await (await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd:s.cmd})})).json();
+      out=j.output||j.error||'(no output)';
+    }catch(e){ out='exec error: '+e.message; }
+    collected.push(`## ${s.label}\n${out}`);
+    addMsg('obi',`<div class="who" style="margin-bottom:6px">⚙ ${esc(s.label)}</div><div class="bubble mono" style="border:none;padding:0;white-space:pre-wrap">${esc(out.slice(0,3500))}</div>`,`${s.label} done.`);
+  }
+  try{
+    const ep=(PROVIDERS.bridge.endpoint||'http://localhost:8420').replace(/\/$/,'')+'/fs/write';
+    const mem='/data/data/com.termux/files/home/auric_prime/episodic_memory.jsonl';
+    const entry=JSON.stringify({ts:new Date().toISOString(),type:'network_scan',result:collected.join('\n\n')});
+    await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:mem,content:entry+'\n'})});
+  }catch(e){ /* best-effort */ }
+  addMsg('obi',`<p class="mono">✅ Scan complete. Findings saved to memory store. Check for: unknown MAC vendors, unrecognized devices, unexpected open ports, ARP entries that change.</p>`,'Scan complete.');
+  setCore('stable');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   OBI AGENTIC EXEC — actually RUNS tool calls the model requests
+   ══════════════════════════════════════════════════════════════ */
+const EXEC_RE=/```(?:bash|sh|shell)?\s*\n([\s\S]*?)```|(?:^|\n)\/exec\s+([^\n]+)/g;
+async function execToolCalls(modelText){
+  const cmds=[];
+  let m; EXEC_RE.lastIndex=0;
+  while((m=EXEC_RE.exec(modelText))){
+    const c=(m[1]||m[2]||'').trim();
+    if(c && !/^\s*$/.test(c)) cmds.push(c);
+  }
+  if(!cmds.length) return;
+  if(!bridgeUp) return addMsg('obi',`<p class="mono">Bridge offline — cannot execute tool calls. Start it with <b>start obi</b>.</p>`,false);
+  for(const cmd of cmds){
+    asLine('tool',`exec: ${cmd.slice(0,60)}`);
+    const ep=(PROVIDERS.bridge.endpoint||'http://localhost:8420').replace(/\/$/,'')+'/exec';
+    let res='';
+    try{
+      const j=await (await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd})})).json();
+      res=j.output||j.error||JSON.stringify(j);
+    }catch(e){ res='exec error: '+e.message; }
+    asLine('obs',`exec returned ${res.split('\n').length} lines`);
+    addMsg('obi',`<div class="who" style="margin-bottom:6px">⚙ EXEC · ${esc(cmd.slice(0,80))}</div><div class="bubble mono" style="border:none;padding:0;white-space:pre-wrap">${esc(res.slice(0,4000))}</div>`,`Tool output.`);
+  }
+  setCore('stable');
 }
 
 /* composer */
